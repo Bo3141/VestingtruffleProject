@@ -15,6 +15,7 @@ contract VestingContract {
     address public owner;
     uint256 public vestingPeriod;
     uint256 public numberOfPeriods;
+    uint256 public lockedForPaymentsTokens;
 
     mapping(address => Recipient) public recipients;
 
@@ -34,6 +35,7 @@ contract VestingContract {
         numberOfPeriods = _numberOfPeriods;
         tokenContractAddress = _tokenAddress;
         tokenContract = IERC20(_tokenAddress);
+        lockedForPaymentsTokens = 0;
     }
 
     modifier onlyOwner() {
@@ -54,8 +56,9 @@ contract VestingContract {
     // }
 
     function addRecipient(uint256 _amountToShare, address _recipient) external onlyOwner {
-        //require (_amountToShare * 10**uint256(18) <= token.balanceOf(address(this)), 'Not enough tokens to share!');
-
+        uint256 availableTokens = tokenContract.balanceOf(address(this)) - lockedForPaymentsTokens;
+        require (_amountToShare <= availableTokens,'Not enough tokens to share!');
+        lockedForPaymentsTokens += _amountToShare;
         recipients[_recipient] = Recipient(block.timestamp, _amountToShare, 0);
     }
 
@@ -73,8 +76,9 @@ contract VestingContract {
 
         uint256 tokensToTransfer = transhesToShare * (r.totalTokensToShare / numberOfPeriods);
         tokensToTransfer = (tokensToTransfer - r.tokensClaimed);
-
+        
         tokenContract.transfer(msg.sender, tokensToTransfer);
+        lockedForPaymentsTokens += tokensToTransfer;
         r.tokensClaimed = r.tokensClaimed + tokensToTransfer;
     }
 }

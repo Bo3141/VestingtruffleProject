@@ -16,7 +16,7 @@ const VESTING_PERIOD = 5 * DAY_IN_SECONDS
 const NUMBER_OF_TRANSHES = 5
 const TOKENS_COUNT = 100
 
-contract("Testset for instanceoftoken properties", () => {
+contract("Testset for vesting contract properties", () => {
     let deployer;
     let user1, user2, user3;
 
@@ -46,22 +46,23 @@ contract("Testset for instanceoftoken properties", () => {
 
         afterEach(async () => await timeMachine.revertToSnapshot(snapshotId));
 
-        // it("Test supply", async () => {
-        //     expect((await instanceOfToken.totalSupply()).toNumber()).to.equal(0);
-        // });
 
         it("Cannot mint zero amount", async () => {
             await truffleAssert.reverts( instanceOfToken.mint(0, { from: deployer }), "Incorrect amount");
         });
 
-        it("cannot share more tokens that it has");
+        it("cannot share more tokens than contract has", async() =>{
+            await instanceOfToken.mintFor(instanceOfContract.address, TOKENS_COUNT);
+            await truffleAssert.reverts(instanceOfContract.addRecipient(TOKENS_COUNT + 1, user3),"Not enough tokens to share!" );
+
+        });
 
         it("should give tokens after first vesting period pasted", async () => {
             
             await instanceOfToken.mintFor(instanceOfContract.address, 10000);
         
             const oldBalance = await instanceOfToken.balanceOf(user1);
-            console.log('oldBalanceOfUser1', oldBalance);
+            // console.log('oldBalanceOfUser1', oldBalance);
 
             await instanceOfContract.addRecipient(TOKENS_COUNT, user1);
         
@@ -102,7 +103,20 @@ contract("Testset for instanceoftoken properties", () => {
           })
 
         it("should give all tokens after all periods are passed", async() => {
+            await instanceOfToken.mintFor(instanceOfContract.address, 10000);
 
+            await instanceOfContract.addRecipient(TOKENS_COUNT, user1);
+
+            const oldBalance =  await instanceOfToken.balanceOf(user1);
+            
+            await timeMachine.advanceTimeAndBlock(VESTING_PERIOD * 10);
+
+            await instanceOfContract.claim({from: user1})
+    
+            const newBalance =  await instanceOfToken.balanceOf(user1);
+        //   console.log(BigNumber(newBalance).toFixed());
+            expect((newBalance - oldBalance)).to.equal(TOKENS_COUNT);
+            //   console.log(BigNumber(await instanceOfToken.balanceOf(instanceOfContract.address)).toFixed());
         });
 
         it("should give no tokens to not registred address", async() =>{
@@ -112,8 +126,9 @@ contract("Testset for instanceoftoken properties", () => {
         });
 
         it("should allow add new recipients only to owner", async() =>{ 
-            
+
             await truffleAssert.reverts(instanceOfContract.addRecipient(100, user1, {from: user1}), "Only owner can call this function")
+        
         });
 
         
